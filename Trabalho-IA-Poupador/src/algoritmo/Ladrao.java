@@ -40,6 +40,7 @@ public class Ladrao extends ProgramaLadrao {
 	public static final int CHEIRO_5_UNIDADE_ATRAS = 5;
 	
 	
+	@SuppressWarnings("unused")
 	private int id;
 	private Memoria memoria = new Memoria();
 	private int moedasRoubadas = 0;
@@ -53,120 +54,102 @@ public class Ladrao extends ProgramaLadrao {
 		id = instancias++ - 4;
 	}
 	
+	
+	// Função que determina a ação do ladrão
 	public int acao() {
 		
+		// Verifica se o número de moedas aumentou em relação a rodada passada. Caso tenha aumentado, atualiza o número de moedas 
+		// e seta a vontade de roubar para -20, deixando o poupador livre para pegar mais moedas antes de tentá-lo roubar novamente.
+		if (sensor.getNumeroDeMoedas() > moedasRoubadas){
+        	moedasRoubadas = sensor.getNumeroDeMoedas();
+        	vontadeDeRoubar = -20;
+        }
 		
-		Point posicao = sensor.getPosicao();
+		
+		//Pega a posição atual e insere na memória
+		Point posicao = sensor.getPosicao();		
+		memoria.insere(posicao);
 				
-		
-		if (id == 3) {
-			System.out.println("id: " + id );
-			System.out.println("posicao atual: (" + posicao.x + "," + posicao.y + ")");
-			System.out.println("visao:");
-			imprimirVisao();
-		}
-		
-		
+		//Calcula as posições vizinhas
 		Point posicaoCima = new Point(posicao.x, posicao.y - 1);
 		Point posicaoBaixo = new Point(posicao.x, posicao.y + 1);
 		Point posicaoDireita = new Point(posicao.x + 1, posicao.y);
 		Point posicaoEsquerda = new Point(posicao.x - 1, posicao.y);
 		
-				
-		Map <Integer, Double> acao = new HashMap <>();	
 		
-		
+		//Cria um map onde a chave é o movimento e o valor é o valor de utilidade mais o peso de memória(peso negativo) para aquela posicao		
+		Map <Integer, Double> acao = new HashMap <>();		
 		acao.put(CIMA, valorUtilidade(CIMA) + memoria.pesoMemoria(posicaoCima));
 		acao.put(BAIXO, valorUtilidade(BAIXO) + memoria.pesoMemoria(posicaoBaixo));
 		acao.put(DIREITA, valorUtilidade(DIREITA) + memoria.pesoMemoria(posicaoDireita));
 		acao.put(ESQUERDA, valorUtilidade(ESQUERDA) + memoria.pesoMemoria(posicaoEsquerda));			
 		
 		
-		if (id == 3) {
-			System.out.println("posicao cima: " + posicaoCima + " valor utilidade: " + acao.get(1));
-			System.out.println("posicao baixo: " + posicaoBaixo + " valor utilidade: " + acao.get(2));
-			System.out.println("posicao direita: " + posicaoDireita + " valor utilidade: " + acao.get(3));
-			System.out.println("posicao esquerda: " + posicaoEsquerda + " valor utilidade: " + acao.get(4));
-		}
-		
-		
-		
+		//Cria uma lista com os movimentos de maior valor utilidade
 		List<Integer> movimentosCandidatos = new ArrayList<>();
-				
+		
+		// Busca o maior valor utilidade
 		double maiorUtilidade = (Collections.max(acao.values()));  
-        for (Entry<Integer, Double> entry : acao.entrySet()) { 
+        
+		// Encontra os movimentos que possuem o maior valor utilidade
+		for (Entry<Integer, Double> entry : acao.entrySet()) { 
             if (entry.getValue() == maiorUtilidade) {
                 movimentosCandidatos.add(entry.getKey());
             }
         }
 		
-        int index = new Random().nextInt(movimentosCandidatos.size());
         
-        
-        
-        memoria.insere(posicao);
-        if (sensor.getNumeroDeMoedas() > moedasRoubadas){
-        	moedasRoubadas = sensor.getNumeroDeMoedas();
-        	vontadeDeRoubar = -10;
-        }	
-        
-        
-        
-        if (id == 3) {
-        	System.out.println("movimentos candidatos: " + movimentosCandidatos);
-        	System.out.println("proximo movimento: " + movimentosCandidatos.get(index));
-        	System.out.println("memoria: " + memoria);
-        	System.out.println("moedas roubadas: " + moedasRoubadas);
-        	System.out.println("moedas na rodada: " + sensor.getNumeroDeMoedas());
-        	System.out.println("vontade de roubar: " + vontadeDeRoubar);
-        	System.out.println("jogadas atras de poupador: " + jogadasAtrasDePoupador);
-        }
-        
-        
+        // No caso de mais de um movimento ter o maior valor utilidade, escolhe aleatoriamente o movimento
+        int index = new Random().nextInt(movimentosCandidatos.size());      
                 
-		return movimentosCandidatos.get(index);
-		
+		return movimentosCandidatos.get(index);		
 		
 	}	
 	
 	
-	
+	// Função que determina o valor de utilidade de um movimento
 	private double valorUtilidade(int movimento){
 		
-		
+		// Pega do sensor as informações de visão e olfato
 		int[] visao = sensor.getVisaoIdentificacao();
 		int[] olfatoPoupador = sensor.getAmbienteOlfatoPoupador();
 		int[] olfatoLadrao = sensor.getAmbienteOlfatoLadrao();		
 		
+		
+		// Filtra as posições da visão e do olfato que interessam para o movimento
 		int[] visaoDoMovimento = this.regiaoDaVisao(visao, movimento);
 		int[] olfatoPoupadorDoMovimento = this.regiaoDoOlfato(olfatoPoupador, movimento);
 		int[] olfatoLadraoDoMovimento = this.regiaoDoOlfato(olfatoLadrao, movimento);
 
 		
 		double valorUtilidade = 0;
-		int qtdeDePercepcoesRelevantes = 0;		
+		int qtdeDePercepcoesRelevantes = 0;
 		
+		// Vontade de roubar aumenta a cada vez que o Ladrão calcula o valor utilidade de um movimento
+		vontadeDeRoubar++;
+				
+		// Verifica se um Poupador está na vizinhança do Ladrão. Caso o Ladrão esteja a 20 rodadas com um Poupador em sua vizinhaça, 
+		// a vontade de roubar é setada para -20 para que o Ladrão passe a explorar o mapa ao invés de ficar sempre atrás do mesmo Poupador. 
 		if (visaoDoMovimento[0] == POUPADOR) {
-			if (jogadasAtrasDePoupador == 5) {
-				vontadeDeRoubar = -10;
+			if (jogadasAtrasDePoupador == 20) {
+				vontadeDeRoubar = -20;
 				jogadasAtrasDePoupador = 0;
 			}else {
-				vontadeDeRoubar++;
 				jogadasAtrasDePoupador++;
 			}
-		} else {
-			vontadeDeRoubar++;
-		}
-				
+		} 
+		
+		// Para evitar que o Ladrão tente ir para uma posição que ele não pode ocupar
 		if ( visaoDoMovimento[0] != POUPADOR && visaoDoMovimento[0] != CELULA_VAZIA ) {
 			valorUtilidade = -10000;
+		
 		} else {
 						
-			
+			// Faz a análise da visão
 			for (int i = 0; i < visaoDoMovimento.length; i++) {
 				switch (visaoDoMovimento[i]){
 					case POUPADOR:
-						valorUtilidade += POUPADOR * vontadeDeRoubar * 80.0/distancia(i);
+						valorUtilidade += POUPADOR * vontadeDeRoubar * 1000.0/distancia(i);
 						qtdeDePercepcoesRelevantes++;
 						break;
 					case LADRAO:
@@ -174,15 +157,15 @@ public class Ladrao extends ProgramaLadrao {
 						qtdeDePercepcoesRelevantes++;
 						break;
 					case PASTILHA_PODER:
-						valorUtilidade += PASTILHA_PODER;
+						valorUtilidade += -PASTILHA_PODER;
 						qtdeDePercepcoesRelevantes++;
 						break;
 					case MOEDA:
-						valorUtilidade += MOEDA;
+						valorUtilidade += MOEDA * fatorRandomico(0, 1);
 						qtdeDePercepcoesRelevantes++;
 						break;
 					case BANCO:
-						valorUtilidade += BANCO;
+						valorUtilidade += BANCO * fatorRandomico(0, 1);
 						qtdeDePercepcoesRelevantes++;
 						break;
 					case SEM_VISAO:
@@ -196,7 +179,7 @@ public class Ladrao extends ProgramaLadrao {
 				}		
 			}
 			
-			
+			// Faz a análise do rastro dos Poupadores
 			for (int i = 0; i < olfatoPoupadorDoMovimento.length; i++) {
 				
 				switch (olfatoPoupadorDoMovimento[i]){
@@ -223,7 +206,7 @@ public class Ladrao extends ProgramaLadrao {
 				}
 			}	
 			
-			
+			// Faz a análise do rastro dos Ladrões
 			for (int i = 0; i < olfatoLadraoDoMovimento.length; i++) {
 				
 				switch (olfatoLadraoDoMovimento[i]){
@@ -267,9 +250,9 @@ public class Ladrao extends ProgramaLadrao {
 	 * @param movimento
 	 * @return regiao da visao que interessa para o movimento 
 	 * 
-	 * A regirao retornada é ordenada de acordo com a distancia do agente, 
-	 * onde a posicao 0 = distancia 1, posicoes 1 - 3 = distancia 2
-	 * posicoes 4 - 7 distancia 3 e posicoes 8 e 9 = distancia 4
+	 * A regiao retornada é ordenada de acordo com a distancia do agente, 
+	 * onde a posicao 0 = distancia 1, posicoes 1 a 3 = distancia 2
+	 * posicoes 4 a 7 = distancia 3 e posicoes 8 e 9 = distancia 4
 	 */
 	private int[] regiaoDaVisao(int[] visao, int movimento) {
 		
@@ -306,7 +289,7 @@ public class Ladrao extends ProgramaLadrao {
 	 * @param movimento
 	 * @return regiao do olfato que interessa para o movimento 
 	 * 
-	 * A regirao retornada é ordenada de acordo com a distancia do agente, 
+	 * A região retornada é ordenada de acordo com a distância do agente, 
 	 * onde a posicao 0 = distancia 1, posicoes 1 e 2 = distancia 2
 	 */
 	private int[] regiaoDoOlfato(int[] olfato, int movimento) {
@@ -335,9 +318,8 @@ public class Ladrao extends ProgramaLadrao {
 		return regiaoDeInteresse;
 		
 	}
-	
-	
-	
+		
+	// Método para calcular a distância da posição para o agente dado o indice do vetor
 	private int distancia(int posicao){
 		if (posicao == 0){
 			return 1;
@@ -349,26 +331,19 @@ public class Ladrao extends ProgramaLadrao {
 			return 4;
 		}
 	}
-	
-	
-	
-	private void imprimirVisao(){
 		
-		int[] visao = sensor.getVisaoIdentificacao();
-		
-		System.out.println(visao [0] + " " + visao [1] + " " + visao [2] + " " + visao [3] + " " + visao [4] + "\n ");
-		System.out.println(visao [5] + " " + visao [6] + " " + visao [7] + " " + visao [8] + " " + visao [9] + "\n ");
-		System.out.println(visao [10] + " " + visao [11] + " " + "X" + " " + visao [12] + " " + visao [13] + "\n ");
-		System.out.println(visao [14] + " " + visao [15] + " " + visao [16] + " " + visao [17] + " " + visao [18] + "\n ");
-		System.out.println(visao [19] + " " + visao [20] + " " + visao [21] + " " + visao [22] + " " + visao [23] + "\n ");
-		
+	// Retorna um valor randômico dentro de um intervalo
+	private Double fatorRandomico(double min, double max) {
+		Random r = new Random();
+		double randomValue = min + (max - min) * r.nextDouble();
+		System.out.println(randomValue);
+		return randomValue;		
 	}
-	
 
 }
 
 
-
+// Classe que implementa a memória do Ladrão tendo o comportamento de uma Fila
 class Memoria {
 	
 	private List<Point> points;
@@ -378,7 +353,7 @@ class Memoria {
 		points = new LinkedList<Point>();
 	}
 	
-	
+	// Insere um ponto sempre no final. Se o tamanho for 30 remove o primeiro, por ser o ponto que está a mais tempo na memória
 	public void insere(Point point) {
 				
 		if (points.size() >= 30) {
@@ -389,12 +364,15 @@ class Memoria {
 		
 	}
 	
-	
+	// Calcula um peso negativo relacionado as ocorrencias de um ponto na memória e ao tempo que está na memória.
 	public double pesoMemoria(Point point) {
 		
 		double peso = 0;		
 		
+		// Varre a memória procurando o ponto
 		for (int i = 0; i < points.size(); i++) {
+			
+			// para todas as vezes que o ponto for encontrado na memória, o peso é incrementado com um valor relativo a posição do ponto da memória.
 			if(points.get(i).getX() == point.getX() && points.get(i).getY() == point.getY()){
 				peso = peso + (new Double(i + 1)/points.size());				
 			}	
